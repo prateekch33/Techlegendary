@@ -14,26 +14,37 @@ app.get("/", (req, res) => {
 });
 
 app.get(`/getFollowerCount`, async (req, res) => {
-  // var insta = req.query.insta;
+  var instagram = req.query.insta;
   var twitch = req.query.twitch;
-  // var twitter = req.query.twitter;
   var youtube = req.body.youtube;
   let finalData = {};
-  var instaFollower, twitchFollower, twitterFollower, youtubeFollower;
-
-  // fetch(``, {
-  //   method: "GET",
-  // })
-  //   .then((res) => res.json())
-  //   .then((data) => {
-  //     instaFollower = data.followers;
-  //   })
-  //   .catch((err) => {
-  //     return res.status(400).json({ status: -1, error: err.message });
-  //   });
+  var instaFollower, twitchFollower, youtubeFollower;
+  await fetch(
+    `https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&fields=items%2Fsnippet%2FchannelId&q=${youtube}&key=${process.env.YOUTUBE_API_KEY}`,
+    {
+      method: "GET",
+    }
+  )
+    .then((res) => res.json())
+    .then(async (data) => {
+      await fetch(
+        `https://www.googleapis.com/youtube/v3/channels?part=statistics&id=${data.items[0].snippet.channelId}&key=${process.env.YOUTUBE_API_KEY}`,
+        {
+          method: "GET",
+        }
+      )
+        .then((res) => res.json())
+        .then(async (data) => {
+          youtubeFollower = await data.items[0].statistics.subscriberCount;
+        })
+        .catch((err) => {
+          return res.status(400).json({ status: -1, error: err.message });
+        });
+    })
+    .catch((err) => {
+      return res.status(400).json({ status: -1, error: err.message });
+    });
   let access_token = "";
-  // const params = new URLSearchParams();
-  // params.append();
   await fetch(`https://id.twitch.tv/oauth2/token`, {
     method: "POST",
     headers: {
@@ -48,7 +59,6 @@ app.get(`/getFollowerCount`, async (req, res) => {
     .then((res) => res.json())
     .then(async (data) => {
       access_token = data.access_token;
-      console.log(access_token);
       await fetch(`https://api.twitch.tv/helix/users?login=${twitch}`, {
         method: "GET",
         headers: {
@@ -58,7 +68,6 @@ app.get(`/getFollowerCount`, async (req, res) => {
       })
         .then((res) => res.json())
         .then(async (data) => {
-          console.log(data.data[0].id);
           await fetch(
             `https://api.twitch.tv/helix/users/follows?to_id=${data.data[0].id}`,
             {
@@ -84,34 +93,31 @@ app.get(`/getFollowerCount`, async (req, res) => {
     .catch((err) => {
       return res.status(400).json({ status: -1, error: err.message });
     });
-
-  // fetch(``, {
-  //   method: "GET",
-  // })
-  //   .then((res) => res.json())
-  //   .then((data) => {
-  //     twitterFollower = data.followers;
-  //   })
-  //   .catch((err) => {
-  //     return res.status(400).json({ status: -1, error: err.message });
-  //   });
-
-  // fetch(``, {
-  //   method: "GET",
-  // })
-  //   .then((res) => res.json())
-  //   .then((data) => {
-  //     youtubeFollower = data.followers;
-  //   })
-  //   .catch((err) => {
-  //     return res.status(400).json({ status: -1, error: err.message });
-  //   });
+  await fetch(
+    `https://instagram28.p.rapidapi.com/user_info?user_name=${instagram}`,
+    {
+      method: "GET",
+      headers: {
+        "X-RapidAPI-Key": `${process.env.INSTAGRAM_API_KEY}`,
+        "X-RapidAPI-Host": "instagram28.p.rapidapi.com",
+      },
+    }
+  )
+    .then((res) => res.json())
+    .then((data) => {
+      instaFollower = data.data.user.edge_followed_by.count;
+    })
+    .catch((err) => {
+      return res.status(400).json({ status: -1, error: err.message });
+    });
 
   finalData = {
+    instagram: instaFollower,
     twitch: twitchFollower,
+    youtube: youtubeFollower,
   };
 
-  res.status(200).json({ finalData });
+  return res.status(200).json(finalData);
 });
 
 app.listen(process.env.PORT, () => {
